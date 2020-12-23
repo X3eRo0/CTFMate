@@ -3,13 +3,16 @@ import urllib.request as request
 import os, sys
 import tarfile
 import tempfile
-import unix_ar
 import subprocess
 import requests
-import json
 import shutil
-import pdb
+import argparse
 
+try:
+    import unix_ar
+except:
+    print("[-] unix_ar not installed")
+    exit(-1)
 
 
 GLIBC_VERSION_STR = [
@@ -18,8 +21,15 @@ GLIBC_VERSION_STR = [
     b"GNU C Library (Debian GLIBC "
 ]
 
-ubuntu_libc_deb_url = "https://launchpad.net/ubuntu/+archive/primary/+files/"
-debian_libc_deb_url = "http://ftp.us.debian.org/debian/pool/main/g/glibc/"
+ubuntu_libc_deb_urls = [
+    "http://security.ubuntu.com/ubuntu/pool/main/g/glibc/",
+    "https://launchpad.net/ubuntu/+archive/primary/+files/"
+]
+
+debian_libc_deb_urls = [
+    "http://ftp.us.debian.org/debian/pool/main/g/glibc/",
+]
+
 libc_dbg_pkg = "libc6-dbg_%s.deb"
 
 libc_pkg = "libc6_%s.deb"
@@ -39,6 +49,37 @@ def reporthook(blocknum, blocksize, totalsize):
     else:
         sys.stderr.write("read %d\n" % (readsofar,))
 
+def CheckDependencies():
+
+    try:
+        proc = subprocess.Popen(["eu-unstrip", "--help"],
+                stdout = subprocess.PIPE,
+                stderr = subprocess.PIPE)
+        stdout, stderr = proc.communicate()
+        eu_unstrip = proc.returncode
+
+    except FileNotFoundError:
+        eu_unstrip = -1
+
+    try:
+        proc = subprocess.Popen(["patchelf", "--help"],
+                stdout = subprocess.PIPE,
+                stderr = subprocess.PIPE)
+        stdout, stderr = proc.communicate()
+        patchelf = proc.returncode
+
+    except FileNotFoundError:
+        patchelf = -1
+
+    if eu_unstrip + patchelf != 0:
+        print("[-] Missing Dependencies:")
+        if eu_unstrip != 0:
+            print(" -= eu_unstrip")
+        if patchelf != 0:
+            print(" -= patchelf")
+
+    return eu_unstrip + patchelf
+
 
 def Download(url, directory, filename):
     global FILENAME
@@ -48,13 +89,10 @@ def Download(url, directory, filename):
     try:
         request.urlretrieve(url, fullpath, reporthook)
 
-    except urllib.error.HTTPError:
-        url = str(input("[-] %s Not Found!\n[+] Custom URL/N: " % filename))
-        if url != "n" and url != "N":
-            fullpath = Download(url, directory, filename)
-        else:
-            print("[-] Exiting")
-            exit(-1)
+    except urllib.error.HTTPError as e:
+
+        print("[-] Error    : %s Not Found" % filename)
+        exit(-1)
 
         
     return fullpath
@@ -188,13 +226,29 @@ def GetLinker(libc_version, output):
     pkgname = libc_pkg % (libc_version)
 
     if "ubuntu" in libc_version:
-        pkgurl  = ubuntu_libc_deb_url + pkgname
+        pkgurl  = GetUrl(ubuntu_libc_deb_urls, pkgname)
     elif "deb" in libc_version:
-        pkgurl  = debian_libc_deb_url + pkgname
+        pkgurl  = GetUrl(debian_libc_deb_urls, pkgname)
+
+    if pkgurl == None:
+
+        pkgurl = str(input("[-] %s Not Found!\n[+] Custom URL/N: " % filename))
+        if pkgurl == "n" or url == "N":
+            print("[-] Exiting")
+            exit(-1)
 
     debpkg  = Download(pkgurl, output, pkgname)
     linker  = ExtractLinker(output, debpkg)
     return linker
+
+def GetUrl(urllist, file):
+
+    for url in urllist:
+        fullurl = url + file
+        r = requests.head(fullurl)
+        if r.status_code != 404:
+            return fullurl
+    return None
 
 
 def GetGLibcPkg(libc_version, output):
@@ -202,10 +256,17 @@ def GetGLibcPkg(libc_version, output):
     pkgname = libc_dbg_pkg % (libc_version)
     
     if "ubuntu" in libc_version:
-        pkgurl  = ubuntu_libc_deb_url + pkgname
+        pkgurl  = GetUrl(ubuntu_libc_deb_urls, pkgname)
     elif "deb" in libc_version:
-        pkgurl  = debian_libc_deb_url + pkgname
-    
+        pkgurl  = GetUrl(debian_libc_deb_urls, pkgname)
+
+    if pkgurl == None:
+
+        pkgurl = str(input("[-] %s Not Found!\n[+] Custom URL/N: " % filename))
+        if pkgurl == "n" or url == "N":
+            print("[-] Exiting")
+            exit(-1)
+
     debpkg  = Download(pkgurl, output, pkgname)
     libcso  = ExtractLibc(output, debpkg)
     return libcso
@@ -288,12 +349,16 @@ def Search(symbol, offset):
             print("    str_bin_sh -- 0x%x" % GetLibcOffset(symbol_file, 'str_bin_sh'))
             i += 1
 
-        indx = int(input("\nLibc[?]: ")) - 1
+        indx = input("\nLibc[?]/N: ")
+        if indx == "N" or indx == "n":
+            return
+        indx = int(indx) - 1
         libcver = GetLibcVersionFromID(libcs[indx]['libc_id'])
         temp = tempfile.TemporaryDirectory(dir = '/tmp')
         slib = Download(libcs[indx]['down_url'], os.getcwd(), libcs[indx]['libc_id'])
         filename = os.path.basename(slib)
-        shutil.move(slib, os.getcwd())
+        if not os.path.exists(os.path.join(os.getcwd(), filename)):
+            shutil.move(slib, os.getcwd())
         temp.cleanup()
 
 
@@ -312,7 +377,13 @@ def main(binary):
             libc = file
     
     filename = os.path.basename(libc)
-    print("[+] Libc     : ./%s" % filename) 
+
+    if not os.path.exists(binary):
+        print("[-] Error %s does not exist" % binary)
+        exit(-1)
+
+    print("[+] Binary   : %s" % binary)
+    print("[+] Libc     : %s" % filename) 
     
     if filename != "libc.so.6":
         os.rename(libc, os.path.join(os.getcwd(), "libc.so.6"))
@@ -333,15 +404,16 @@ def main(binary):
     
     code = Unstrip(libc, libcdbg)
     if code != 0:
-        print("[-] eu-unstrip [%.d] -- %s" % (code, filename))
+        print("[-] Error    : \"eu-unstrip\" [%.d] -- %s" % (code, filename))
+        input()
     else:
         print("[+] Patched  : %s" % filename)
 
     if PatchInterpreter(binary, linkern) != 0:
-        print("[-] \"patchelf\" failed to patch interpreter")
+        print("[-] Error    : \"patchelf\" failed to patch interpreter")
     
-    elif PatchRPath(binary) != 0:
-        print("[-] \"patchelf\" failed to patch rpath")
+    if PatchRPath(binary) != 0:
+        print("[-] Error    : \"patchelf\" failed to patch rpath")
     
     else:
         print("[+] Patched  : %s" % binary)
@@ -349,6 +421,31 @@ def main(binary):
     tempdir.cleanup()
 
 if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(
+        description="initiate environment for pwning in CTFs."
+        )
+
+    parser.add_argument('-b', '--binary', dest='binary', help='initiate environment for this binary')
+    parser.add_argument('-s', '--search', dest='search', action='store_true', help='search libc')
+    parser.add_argument('-S', '--symbol', dest='symbol', help='libc symbol')
+    parser.add_argument('-o', '--offset', dest='offset', help='libc offset')
+
+    args = parser.parse_args()
+
     
-    main("./ghostdiary")
-    # Search("__libc_start_main_ret", "0xe81")
+    if CheckDependencies() == 0:
+        if args.binary:
+            main(args.binary)
+        elif args.search:
+            if args.symbol:
+                if args.offset:
+                    Search(args.symbol, args.offset)
+                else:
+                    print("Error: offset was not provided for '%s'" % args.symbol)
+            else:
+                print("Error: symbol was not provided for searching")
+        else:
+            parser.print_help()
+    else:
+        exit(-1)
