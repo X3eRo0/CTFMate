@@ -9,11 +9,12 @@ import subprocess
 import requests
 import shutil
 import argparse
+import signal
 
 try:
     import unix_ar
 except:
-    print("[-] unix_ar not installed")
+    sys.stdout.write("\r[-] unix_ar not installed")
     exit(-1)
 
 
@@ -38,16 +39,21 @@ libc_pkg = "libc6_%s.deb"
 FILENAME = "libc"
 
 
+def SIGINT_Handler(sig, frame):
+    print("[-] Exiting (CTRL-C)")
+    sys.exit(0)
+
+
 def reporthook(blocknum, blocksize, totalsize):
     global FILENAME
     readsofar = blocknum * blocksize
     if totalsize > 0:
         percent = readsofar * 1e2 / totalsize
-        s = "\r[+] Fetching : [%5.1f%% %*d KB / %d KB] %s" % (
+        s = "\r[+] Fetching     : [%5.1f%% %*d KB / %d KB] %s" % (
             percent, len(str(totalsize)), readsofar/1024, totalsize/1024, FILENAME)
         sys.stderr.write(s)
         if readsofar >= totalsize:
-            sys.stderr.write("\r[+] Fetched  : [%5.1f%% %*d KB / %d KB] %s\n" % (100.0, len(str(totalsize)), totalsize/1024, totalsize/1024, FILENAME))
+            sys.stderr.write("\r[+] Fetched      : [%5.1f%% %*d KB / %d KB] %s\n" % (100.0, len(str(totalsize)), totalsize/1024, totalsize/1024, FILENAME))
     else:
         sys.stderr.write("read %d\n" % (readsofar,))
 
@@ -234,10 +240,9 @@ def GetLinker(libc_version, output):
 
     if pkgurl == None:
 
-        pkgurl = str(input("[-] %s Not Found!\n[+] Custom URL/N: " % filename))
-        if pkgurl == "n" or url == "N":
-            print("[-] Exiting")
-            exit(-1)
+        pkgurl = str(input("[-] Error 404    : %s Not Found!\n[+] Custom URL/N : " % pkgname))
+        if pkgurl == "n" or pkgurl == "N":
+            return None
 
     debpkg  = Download(pkgurl, output, pkgname)
     linker  = ExtractLinker(output, debpkg)
@@ -264,10 +269,9 @@ def GetGLibcPkg(libc_version, output):
 
     if pkgurl == None:
 
-        pkgurl = str(input("[-] %s Not Found!\n[+] Custom URL/N: " % pkgname))
-        if pkgurl == "n" or url == "N":
-            print("[-] Exiting")
-            exit(-1)
+        pkgurl = str(input("[-] Error 404    : %s Not Found!\n[+] Custom URL/N : " % pkgname))
+        if pkgurl == "n" or pkgurl == "N":
+            return None
 
     debpkg  = Download(pkgurl, output, pkgname)
     libcso  = ExtractLibc(output, debpkg)
@@ -345,10 +349,11 @@ def Search(symbol, offset):
         i = 1
         for libc in libcs:
             symbol_file = GetLibcSymDb(libc['symb_url'])
-            print("[%d] id - %s" % (i, libc['libc_id']))
-            print("    puts       -- 0x%x" % GetLibcOffset(symbol_file, 'puts'))
-            print("    system     -- 0x%x" % GetLibcOffset(symbol_file, 'system'))
-            print("    str_bin_sh -- 0x%x" % GetLibcOffset(symbol_file, 'str_bin_sh'))
+            print("\n[%d] id - %s" % (i, libc['libc_id']))
+            print("    0x%.8x --> %s" % (GetLibcOffset(symbol_file, symbol), symbol))
+            print("    0x%.8x --> puts" % GetLibcOffset(symbol_file, 'puts'))
+            print("    0x%.8x --> system" % GetLibcOffset(symbol_file, 'system'))
+            print("    0x%.8x --> str_bin_sh\n" % GetLibcOffset(symbol_file, 'str_bin_sh'))
             i += 1
 
         indx = input("\nLibc[?]/N: ")
@@ -367,16 +372,35 @@ def Search(symbol, offset):
     elif len(res) == 0:
         print("[+] No Libc's Found")
 
-    
 
+def GenerateTemplate(binary, host, port):
+   
+    if host == None:
+        host = "127.0.0.1"
 
-def main(binary):
+    if port == None:
+        port = "1337"
+
+    template_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'template.py')
+    with open(template_path, 'r') as t:
+        template = t.read()
+
+    template = template % (binary, host, port)
+    template_path = os.path.join(os.getcwd(), 'exploit.py')
+    with open(template_path, 'w') as t:
+        t.write(template)
+        print("[+] Exploit      : 'exploit.py' Template Generated")
+        return
+    print("[-] Error writing to 'exploit.py'")
+    return
+
+def main(binary, libc, linker, host, port):
 
     cdfiles = AbsoluteFilePaths(os.getcwd())
-    
-    for file in cdfiles:
-        if CheckLibc(file):
-            libc = file
+    if libc == None:
+        for file in cdfiles:
+            if CheckLibc(file):
+                libc = file
     
     filename = os.path.basename(libc)
 
@@ -384,8 +408,9 @@ def main(binary):
         print("[-] Error %s does not exist" % binary)
         exit(-1)
 
-    print("[+] Binary   : %s" % binary)
-    print("[+] Libc     : %s" % filename) 
+
+    print("[+] Binary       : %s" % binary)
+    print("[+] Libc         : %s" % filename) 
     
     if filename != "libc.so.6":
         os.rename(libc, os.path.join(os.getcwd(), "libc.so.6"))
@@ -395,34 +420,46 @@ def main(binary):
     tempdir  = tempfile.TemporaryDirectory(dir = "/tmp")
     libcver  = GetLibcVersion(libc)
 
-    print("[+] Version  : %s" % libcver)
+    print("[+] Version      : %s" % libcver)
 
     libcdbg  = GetGLibcPkg(libcver, tempdir.name)
-    linker   = GetLinker(libcver, tempdir.name)
-    linkern  = os.path.basename(linker)
+    if libcdbg != None:
+        code = Unstrip(libc, libcdbg)
+        if code != 0:
+            print("[-] Error        : \"eu-unstrip\" [%.d] -- %s" % (code, filename))
+        else:
+            print("[+] Patched      : %s" % filename)
     
-    if not os.path.exists(os.path.join(os.getcwd(), linkern)):
-        shutil.move(linker, os.getcwd())
-    
-    code = Unstrip(libc, libcdbg)
-    if code != 0:
-        print("[-] Error    : \"eu-unstrip\" [%.d] -- %s" % (code, filename))
-        input()
-    else:
-        print("[+] Patched  : %s" % filename)
 
-    if PatchInterpreter(binary, linkern) != 0:
-        print("[-] Error    : \"patchelf\" failed to patch interpreter")
+    if linker == None:
+        linker   = GetLinker(libcver, tempdir.name)
+        if linker != None:
+            linkern  = os.path.basename(linker)
+    else:
+        linkern  = linker 
+        linker   = os.path.abspath(linker)
+    
+    if linker != None:
+        if not os.path.exists(os.path.join(os.getcwd(), linkern)):
+            shutil.move(linker, os.getcwd())
+    
+        if PatchInterpreter(binary, linkern) != 0:
+            print("[-] Error        : \"patchelf\" failed to patch interpreter")
     
     if PatchRPath(binary) != 0:
-        print("[-] Error    : \"patchelf\" failed to patch rpath")
+        print("[-] Error        : \"patchelf\" failed to patch rpath")
     
     else:
-        print("[+] Patched  : %s" % binary)
-
+        print("[+] Patched      : %s" % binary)
+    
+    GenerateTemplate(binary, host, port)
     tempdir.cleanup()
 
 if __name__ == "__main__":
+
+    
+    signal.signal(signal.SIGINT, SIGINT_Handler)
+    
 
     parser = argparse.ArgumentParser(
         description="initiate environment for pwning in CTFs."
@@ -432,13 +469,20 @@ if __name__ == "__main__":
     parser.add_argument('-s', '--search', dest='search', action='store_true', help='search libc')
     parser.add_argument('-S', '--symbol', dest='symbol', help='libc symbol')
     parser.add_argument('-o', '--offset', dest='offset', help='libc offset')
-
+    parser.add_argument('-pr', '--patch-rpath', action='store_true', dest='patch_rpath', help="patch binary's rpath")
+    parser.add_argument('-pi', '--patch-interpreter', action='store_true', dest='patch_interpreter', help="patch binary's interpreter")
+    parser.add_argument('-lc', '--libc', dest='libc', help='libc binary for patching')
+    parser.add_argument('-ld', '--ld', dest='linker', help='linker binary for patching')
+    parser.add_argument('-H', '--host', dest='host', help='vulnerable server ip')
+    parser.add_argument('-P', '--port', dest='port', help='vulnerable server port')
+    parser.add_argument('-t', '--template', action='store_true', dest='template', help='generate template exploit.py')
     args = parser.parse_args()
-
+    
     
     if CheckDependencies() == 0:
-        if args.binary:
-            main(args.binary)
+        if args.binary and not args.patch_rpath and not args.patch_interpreter and not args.template:
+            main(args.binary, args.libc, args.linker, args.host, args.port)
+    
         elif args.search:
             if args.symbol:
                 if args.offset:
@@ -447,7 +491,36 @@ if __name__ == "__main__":
                     print("Error: offset was not provided for '%s'" % args.symbol)
             else:
                 print("Error: symbol was not provided for searching")
+    
+        elif args.patch_rpath:
+            if args.binary:
+                if PatchRPath(args.binary) != 0:
+                    print("[-] Error     : \"patchelf\" failed to patch rpath")
+                else:
+                    print("[+] Patched   : %s" % args.binary)
+            else:
+                parser.print_usage()
+        
+        elif args.patch_interpreter:
+            if args.binary:
+                if args.linker:
+                    if PatchInterpreter(args.binary, args.linker) != 0:
+                        print("[-] Error     : \"patchelf\" failed to patch interpreter")
+
+                    else:
+                        print("[+] Patched   : %s" % args.binary)
+                else:
+                    parser.print_usage()
+            else:
+                parser.print_usage()
+
+        elif args.template:
+            if args.binary:
+                GenerateTemplate(args.binary, args.host, args.port)
+            else:
+                parser.print_usage()
+
         else:
-            parser.print_help()
+            parser.print_usage()
     else:
         exit(-1)
