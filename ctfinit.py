@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 import urllib
 import urllib.request as request
 import os, sys
@@ -262,7 +264,7 @@ def GetGLibcPkg(libc_version, output):
 
     if pkgurl == None:
 
-        pkgurl = str(input("[-] %s Not Found!\n[+] Custom URL/N: " % filename))
+        pkgurl = str(input("[-] %s Not Found!\n[+] Custom URL/N: " % pkgname))
         if pkgurl == "n" or url == "N":
             print("[-] Exiting")
             exit(-1)
