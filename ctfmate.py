@@ -436,29 +436,30 @@ def main(binary, libc, linker, host, port):
                 print("[+] Patched      : %s" % filename)
     
 
-    if linker == None:
-        linker   = GetLinker(libcver, tempdir.name)
+        if linker == None:
+            linker   = GetLinker(libcver, tempdir.name)
+            if linker != None:
+                linkern  = os.path.basename(linker)
+        else:
+            linkern  = linker 
+            linker   = os.path.abspath(linker)
+        
         if linker != None:
-            linkern  = os.path.basename(linker)
-    else:
-        linkern  = linker 
-        linker   = os.path.abspath(linker)
-    
-    if linker != None:
-        if not os.path.exists(os.path.join(os.getcwd(), linkern)):
-            shutil.move(linker, os.getcwd())
-    
-        if PatchInterpreter(binary, linkern) != 0:
-            print("[-] Error        : \"patchelf\" failed to patch interpreter")
-    
-    if PatchRPath(binary) != 0:
-        print("[-] Error        : \"patchelf\" failed to patch rpath")
-    
-    else:
-        print("[+] Patched      : %s" % binary)
+            if not os.path.exists(os.path.join(os.getcwd(), linkern)):
+                shutil.move(linker, os.getcwd())
+        
+            if PatchInterpreter(binary, linkern) != 0:
+                print("[-] Error        : \"patchelf\" failed to patch interpreter")
+        
+        if PatchRPath(binary) != 0:
+            print("[-] Error        : \"patchelf\" failed to patch rpath")
+        
+        else:
+            print("[+] Patched      : %s" % binary)
+        
+        tempdir.cleanup()
     
     GenerateTemplate(binary, host, port)
-    tempdir.cleanup()
 
 if __name__ == "__main__":
 
