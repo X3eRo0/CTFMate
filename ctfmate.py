@@ -153,19 +153,22 @@ def CheckELF(file):
 
 def CheckLibc(file):
     
-    with open(file, "rb") as f:
-        content = f.read()
-        # check for ELF header
-        if not CheckELF(file):
-            return False
-        # check for libc string
-        if b"GNU C Library" not in content:
-            return False 
-        # check for statically linked binaries
-        if content[7] == b'\x02':
-            return False
-    
-        return True
+    try:
+        with open(file, "rb") as f:
+            content = f.read()
+            # check for ELF header
+            if not CheckELF(file):
+                return False
+            # check for libc string
+            if b"GNU C Library" not in content:
+                return False 
+            # check for statically linked binaries
+            if content[7] == b'\x02':
+                return False
+        
+            return True
+    except:
+        return False
 
 
 def ExtractLibc(directory, filename):
@@ -402,33 +405,35 @@ def main(binary, libc, linker, host, port):
             if CheckLibc(file):
                 libc = file
     
-    filename = os.path.basename(libc)
+   
+    if libc != None:
+        filename = os.path.basename(libc)
 
-    if not os.path.exists(binary):
-        print("[-] Error %s does not exist" % binary)
-        exit(-1)
+        if not os.path.exists(binary):
+            print("[-] Error %s does not exist" % binary)
+            exit(-1)
 
 
-    print("[+] Binary       : %s" % binary)
-    print("[+] Libc         : %s" % filename) 
-    
-    if filename != "libc.so.6":
-        os.rename(libc, os.path.join(os.getcwd(), "libc.so.6"))
-        filename = "libc.so.6"
-        libc = os.path.abspath("./libc.so.6")
+        print("[+] Binary       : %s" % binary)
+        print("[+] Libc         : %s" % filename) 
+        
+        if filename != "libc.so.6":
+            os.rename(libc, os.path.join(os.getcwd(), "libc.so.6"))
+            filename = "libc.so.6"
+            libc = os.path.abspath("./libc.so.6")
 
-    tempdir  = tempfile.TemporaryDirectory(dir = "/tmp")
-    libcver  = GetLibcVersion(libc)
+        tempdir  = tempfile.TemporaryDirectory(dir = "/tmp")
+        libcver  = GetLibcVersion(libc)
 
-    print("[+] Version      : %s" % libcver)
+        print("[+] Version      : %s" % libcver)
 
-    libcdbg  = GetGLibcPkg(libcver, tempdir.name)
-    if libcdbg != None:
-        code = Unstrip(libc, libcdbg)
-        if code != 0:
-            print("[-] Error        : \"eu-unstrip\" [%.d] -- %s" % (code, filename))
-        else:
-            print("[+] Patched      : %s" % filename)
+        libcdbg  = GetGLibcPkg(libcver, tempdir.name)
+        if libcdbg != None:
+            code = Unstrip(libc, libcdbg)
+            if code != 0:
+                print("[-] Error        : \"eu-unstrip\" [%.d] -- %s" % (code, filename))
+            else:
+                print("[+] Patched      : %s" % filename)
     
 
     if linker == None:
