@@ -8,6 +8,8 @@ import requests
 import shutil
 import argparse
 import signal
+from bs4 import BeautifulSoup
+
 
 libc_dbg_pkg = "libc6-dbg_%s.deb"
 libc_pkg = "libc6_%s.deb"
@@ -61,7 +63,6 @@ def Download(url, directory, filename):
         print("[-] Error    : %s Not Found" % filename)
         exit(-1)
 
-        
     return fullpath
 
 def GetUrl(urllist, file):

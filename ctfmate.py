@@ -1,11 +1,10 @@
 #!/usr/bin/python3
 
 from libc import *
-from linker import *
 from common import *
 
 def SIGINT_Handler(sig, frame):
-    print("[-] Exiting (CTRL-C)")
+    print("\n[-] Exiting (CTRL-C)")
     sys.exit(0)
 
 def AbsoluteFilePaths(directory):
@@ -33,19 +32,6 @@ def PatchRPath(binary):
     return returncode
 
 
-def Unstrip(stripped, dbg_libc):
-    
-    stripped = os.path.abspath(stripped)
-    dbg_libc = os.path.abspath(dbg_libc)
-
-    unstrip = subprocess.Popen(["eu-unstrip", stripped, dbg_libc, "-o", stripped],
-            stdout = subprocess.PIPE,
-            stderr = subprocess.PIPE)
-    stdout, stderr = unstrip.communicate()
-    returncode = unstrip.returncode
-    return returncode
-
-
 def GenerateTemplate(binary, host, port):
    
     if host == None:
@@ -67,75 +53,72 @@ def GenerateTemplate(binary, host, port):
     print("[-] Error writing to 'exploit.py'")
     return
 
-def main(binary, libc, linker, host, port):
+def main(binary, libcfile, linkerfile, host, port):
 
     cdfiles = AbsoluteFilePaths(os.getcwd())
-    if libc == None:
+    if libcfile == None:
         for file in cdfiles:
             if CheckLibc(file):
-                libc = file
+                libc = Libc(file)
+    else:
+        GenerateTemplate(binary, host, port)
+        return 
     
-   
-    if libc != None:
-        filename = os.path.basename(libc)
-
-        if not os.path.exists(binary):
-            print("[-] Error %s does not exist" % binary)
-            exit(-1)
+    if not os.path.exists(binary):
+        print("[-] Error %s does not exist" % binary)
+        exit(-1)
 
 
-        print("[+] Binary       : %s" % binary)
-        print("[+] Libc         : %s" % filename) 
-        
-        if filename != "libc.so.6":
-            os.rename(libc, os.path.join(os.getcwd(), "libc.so.6"))
-            filename = "libc.so.6"
-            libc = os.path.abspath("./libc.so.6")
-
-        tempdir  = tempfile.TemporaryDirectory(dir = "/tmp")
-        libcver  = GetLibcVersion(libc)
-
-        print("[+] Version      : %s" % libcver)
-
-        libcdbg  = GetGLibcPkg(libcver, tempdir.name)
-        if libcdbg != None:
-            code = Unstrip(libc, libcdbg)
-            if code != 0:
-                print("[-] Error        : \"eu-unstrip\" [%.d] -- %s" % (code, filename))
-            else:
-                print("[+] Patched      : %s" % filename)
+    print("[+] Binary       : %s" % binary)
+    print("[+] Libc         : %s" % libc.filename) 
     
+    if libc.filename != "libc.so.6":
+        os.rename(libc.fullpath, os.path.join(os.getcwd(), "libc.so.6"))
+        libc.filename = "libc.so.6"
+        libc.fullpath = os.path.abspath("./libc.so.6")
 
-        if linker == None:
-            linker   = GetLinker(libcver, tempdir.name)
-            if linker != None:
-                linkern  = os.path.basename(linker)
+    print("[+] Version      : %s" % libc.version)
+
+    libc.GetGLibcPkg()
+
+    if libc.debugfile != None:
+        code = libc.Unstrip()
+        if code != 0:
+            print("[-] Error        : \"eu-unstrip\" [%.d] -- %s" % (code, libc.filename))
         else:
-            linkern  = linker 
-            linker   = os.path.abspath(linker)
-        
-        if linker != None:
-            if not os.path.exists(os.path.join(os.getcwd(), linkern)):
-                shutil.move(linker, os.getcwd())
-        
-            if PatchInterpreter(binary, linkern) != 0:
-                print("[-] Error        : \"patchelf\" failed to patch interpreter")
-        
-        if PatchRPath(binary) != 0:
-            print("[-] Error        : \"patchelf\" failed to patch rpath")
-        
-        else:
-            print("[+] Patched      : %s" % binary)
-        
-        tempdir.cleanup()
+            print("[+] Patched      : %s" % libc.filename)
+    
+    if linkerfile == None:
+        if libc.linker.GetLinker() != True:
+            print("[-] Error        : Failed to fetch linker")
+        linkerfile = libc.linker.fullpath
+
+    if linkerfile != None:
+        linkerfile = os.path.abspath(linkerfile)
+        libc.linker.fullpath = linkerfile
+        libc.linker.filename = os.path.basename(linkerfile)
+        if not os.path.exists(os.path.join(os.getcwd(), libc.linker.filename)):
+            shutil.move(libc.linker.fullpath, os.getcwd())
+
+        libc.linker.fullpath = os.path.join(os.getcwd(), libc.linker.filename)
+
+        if PatchInterpreter(binary, libc.linker.fullpath) != 0:
+            print("[-] Error        : \"patchelf\" failed to patch interpreter")
+    
+    if PatchRPath(binary) != 0:
+        print("[-] Error        : \"patchelf\" failed to patch rpath")
+    
+    else:
+        print("[+] Patched      : %s" % binary)
+    
     
     GenerateTemplate(binary, host, port)
+
 
 if __name__ == "__main__":
 
     
     signal.signal(signal.SIGINT, SIGINT_Handler)
-    
 
     parser = argparse.ArgumentParser(
         description="initiate environment for pwning in CTFs."
@@ -143,8 +126,6 @@ if __name__ == "__main__":
 
     parser.add_argument('-b', '--binary', dest='binary', help='initiate environment for this binary')
     parser.add_argument('-s', '--search', dest='search', action='store_true', help='search libc')
-    parser.add_argument('-S', '--symbol', dest='symbol', help='libc symbol')
-    parser.add_argument('-o', '--offset', dest='offset', help='libc offset')
     parser.add_argument('-pr', '--patch-rpath', action='store_true', dest='patch_rpath', help="patch binary's rpath")
     parser.add_argument('-pi', '--patch-interpreter', action='store_true', dest='patch_interpreter', help="patch binary's interpreter")
     parser.add_argument('-lc', '--libc', dest='libc', help='libc binary for patching')
@@ -160,13 +141,7 @@ if __name__ == "__main__":
             main(args.binary, args.libc, args.linker, args.host, args.port)
     
         elif args.search:
-            if args.symbol:
-                if args.offset:
-                    Search(args.symbol, args.offset)
-                else:
-                    print("Error: offset was not provided for '%s'" % args.symbol)
-            else:
-                print("Error: symbol was not provided for searching")
+            Search()
     
         elif args.patch_rpath:
             if args.binary:
