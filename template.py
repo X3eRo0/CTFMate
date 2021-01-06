@@ -7,12 +7,14 @@
 
 import os
 import time
-from pwn import *
+import pwn
+
 
 # Set up pwntools for the correct architecture
-exe = context.binary = ELF('%s')
-context.delete_corefiles = True
-context.rename_corefiles = False
+exe = pwn.context.binary = ELF('%s')
+pwn.context.terminal = ["tilix","-a","session-add-right","-e"]
+pwn.context.delete_corefiles = True
+pwn.context.rename_corefiles = False
 
 host = args.HOST or '%s'
 port = int(args.PORT or %s)
@@ -26,14 +28,14 @@ def local(argv=[], *a, **kw):
 
 def remote(argv=[], *a, **kw):
     '''Connect to the process on the remote host'''
-    io = connect(host, port)
-    if args.GDB:
-        gdb.attach(io, gdbscript=gdbscript)
+    io = pwn.connect(host, port)
+    if pwn.args.GDB:
+        pwn.gdb.attach(io, gdbscript=gdbscript)
     return io
 
 def start(argv=[], *a, **kw):
     '''Start the exploit against the target.'''
-    if args.LOCAL:
+    if pwn.args.LOCAL:
         return local(argv, *a, **kw)
     else:
         return remote(argv, *a, **kw)
@@ -50,7 +52,7 @@ continue
 io = start()
 
 def GetOffsetStdin():
-    log_leve = context.log_level
+    log_level = context.log_level
     context.log_level = 'critical'
     if exe.arch != 'amd64':
         print("[-] only amd64 supported")
@@ -69,20 +71,20 @@ def GetOffsetStdin():
 
 
 def GetOffsetArgv():
-    log_leve = context.log_level
-    context.log_level = 'critical'
+    log_level = pwn.context.log_level
+    pwn.context.log_level = 'critical'
     if exe.arch != 'amd64':
         print("[-] only amd64 supported")
         exit(-1)
 
-    p = process([exe.path, cyclic(512)])
+    p = pwn.process([exe.path, cyclic(512)])
     p.wait()
     time.sleep(2)
     core = p.corefile
     fault = core.fault_addr
-    ofst = cyclic_find(fault & 0xffffffff)
+    ofst = pwn.cyclic_find(fault & 0xffffffff)
     p.close()
-    context.log_level = log_level
+    pwn.context.log_level = log_level
     return ofst
 
 
