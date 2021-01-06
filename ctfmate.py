@@ -18,7 +18,7 @@ def PatchInterpreter(binary, linker):
     patchelf = subprocess.Popen(["patchelf", "--set-interpreter", linker, binary],
             stdout = subprocess.PIPE,
             stderr = subprocess.PIPE)
-    stdout, stderr = patchelf.communicate()
+    patchelf.communicate()
     returncode = patchelf.returncode
     return returncode
 
@@ -27,7 +27,7 @@ def PatchRPath(binary):
     patchelf = subprocess.Popen(["patchelf", "--set-rpath", os.getcwd(), binary],
             stdout = subprocess.PIPE,
             stderr = subprocess.PIPE)
-    stdout, stderr = patchelf.communicate()
+    patchelf.communicate()
     returncode = patchelf.returncode
     return returncode
 
@@ -50,16 +50,18 @@ def GenerateTemplate(binary, host, port):
         t.write(template)
         print("[+] Exploit      : 'exploit.py' Template Generated")
         return
-    print("[-] Error writing to 'exploit.py'")
-    return
 
 def main(binary, libcfile, linkerfile, host, port):
 
     cdfiles = AbsoluteFilePaths(os.getcwd())
+    libfile = None
     if libcfile == None:
         for file in cdfiles:
             if CheckLibc(file):
-                libc = Libc(file)
+                libfile = file
+                break
+
+        libc = Libc(libfile)
     else:
         GenerateTemplate(binary, host, port)
         return 
