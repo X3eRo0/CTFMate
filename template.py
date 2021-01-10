@@ -11,7 +11,7 @@ import pwn
 
 
 # Set up pwntools for the correct architecture
-exe = pwn.context.binary = ELF('%s')
+exe = pwn.context.binary = pwn.ELF('%s')
 pwn.context.terminal = ["tilix","-a","session-add-right","-e"]
 pwn.context.delete_corefiles = True
 pwn.context.rename_corefiles = False
