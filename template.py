@@ -16,15 +16,15 @@ pwn.context.terminal = ["tilix","-a","session-add-right","-e"]
 pwn.context.delete_corefiles = True
 pwn.context.rename_corefiles = False
 
-host = args.HOST or '%s'
-port = int(args.PORT or %s)
+host = pwn.args.HOST or '%s'
+port = int(pwn.args.PORT or %s)
 
 def local(argv=[], *a, **kw):
     '''Execute the target binary locally'''
-    if args.GDB:
-        return gdb.debug([exe.path] + argv, gdbscript=gdbscript, *a, **kw)
+    if pwn.args.GDB:
+        return pwn.gdb.debug([exe.path] + argv, gdbscript=gdbscript, *a, **kw)
     else:
-        return process([exe.path] + argv, *a, **kw)
+        return pwn.process([exe.path] + argv, *a, **kw)
 
 def remote(argv=[], *a, **kw):
     '''Connect to the process on the remote host'''
@@ -52,21 +52,21 @@ continue
 io = start()
 
 def GetOffsetStdin():
-    log_level = context.log_level
-    context.log_level = 'critical'
+    log_level = pwn.context.log_level
+    pwn.context.log_level = 'critical'
     if exe.arch != 'amd64':
         print("[-] only amd64 supported")
         exit(-1)
 
-    p = process(exe.path)
-    p.sendline(cyclic(512))
+    p = pwn.process(exe.path)
+    p.sendline(pwn.cyclic(512))
     p.wait()
     time.sleep(2)
     core = p.corefile
     fault = core.fault_addr
-    ofst = cyclic_find(fault & 0xffffffff)
+    ofst = pwn.cyclic_find(fault & 0xffffffff)
     p.close()
-    context.log_level = log_level
+    pwn.context.log_level = log_level
     return ofst
 
 
