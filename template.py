@@ -41,7 +41,6 @@ def start(argv=[], *a, **kw):
         return remote(argv, *a, **kw)
 
 gdbscript = '''
-tbreak *$rebase(0x{exe.entry:x})
 continue
 '''.format(**locals())
 
