@@ -32,6 +32,15 @@ def PatchRPath(binary):
     return returncode
 
 
+def PatchFunction(binary, funcname):
+    with open(binary, "rb") as f:
+        data = f.read()
+
+    data = data.replace(funcname, b"abs".ljust(len(funcname), b'\x00'))
+    with open(binary, "wb") as f:
+        f.write(data)
+    return 
+
 def GenerateTemplate(binary, host, port):
    
     if host == None:
@@ -53,6 +62,9 @@ def GenerateTemplate(binary, host, port):
 
 def main(binary, libcfile, linkerfile, host, port):
 
+    print("[+] Binary       : %s" % binary)
+
+
     cdfiles = AbsoluteFilePaths(os.getcwd())
     libfile = None
     if libcfile == None:
@@ -62,7 +74,8 @@ def main(binary, libcfile, linkerfile, host, port):
                 break
 
         libc = Libc(libfile)
-    else:
+    
+    if libcfile == None and libc.filename == None:
         GenerateTemplate(binary, host, port)
         return 
     
@@ -71,7 +84,6 @@ def main(binary, libcfile, linkerfile, host, port):
         exit(-1)
 
 
-    print("[+] Binary       : %s" % binary)
     print("[+] Libc         : %s" % libc.filename) 
     
     if libc.filename != "libc.so.6":
@@ -111,6 +123,8 @@ def main(binary, libcfile, linkerfile, host, port):
         print("[-] Error        : \"patchelf\" failed to patch rpath")
     
     else:
+
+        PatchFunction(binary, b"alarm")
         print("[+] Patched      : %s" % binary)
     
     
