@@ -35,11 +35,11 @@ def PatchRPath(binary):
 def PatchFunction(binary, funcname):
     with open(binary, "rb") as f:
         data = f.read()
-
-    data = data.replace(funcname, b"abs".ljust(len(funcname), b'\x00'))
-    with open(binary, "wb") as f:
-        f.write(data)
-    return 
+    
+    if funcname in data:
+        data = data.replace(funcname, b"abs".ljust(len(funcname), b'\x00'))
+        with open(binary, "wb") as f:
+            f.write(data)
 
 def GenerateTemplate(binary, host, port):
    
