@@ -4,6 +4,8 @@ General CTF Helper tool
 ### Install
 ```
 $ git clone https://github.com/X3eRo0/CTFMate.git ~/CTFMate
+$ cd ~/CTFMate
+$ pip install -r requirements.txt
 $ sudo ln -s ~/CTFMate/ctfmate.py /usr/bin/ctfmate
 ```
 
