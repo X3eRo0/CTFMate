@@ -244,7 +244,7 @@ class Libc:
         res  = req.json()
             
         libcs = []
-        if res['status'] != 500: 
+        if req.status_code != 500 and req.status_code != 400: 
             for libc in res:
                 libcs.append({
                         "down_url": libc['download_url'],
