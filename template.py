@@ -53,10 +53,6 @@ io = start()
 def GetOffsetStdin():
     log_level = pwn.context.log_level
     pwn.context.log_level = 'critical'
-    if exe.arch != 'amd64':
-        print("[-] only amd64 supported")
-        exit(-1)
-
     p = pwn.process(exe.path)
     p.sendline(pwn.cyclic(512))
     p.wait()
@@ -72,10 +68,6 @@ def GetOffsetStdin():
 def GetOffsetArgv():
     log_level = pwn.context.log_level
     pwn.context.log_level = 'critical'
-    if exe.arch != 'amd64':
-        print("[-] only amd64 supported")
-        exit(-1)
-
     p = pwn.process([exe.path, cyclic(512)])
     p.wait()
     time.sleep(2)
