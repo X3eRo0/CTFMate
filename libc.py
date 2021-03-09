@@ -264,6 +264,9 @@ class Libc:
             blukat_url += i
             blukat_url += ":"
             blukat_url += "%x" % symbol.symbols[i]
+            blukat_url += ","
+        
+        blukat_url = blukat_url[:-1]
     
         res = requests.get(blukat_url)
         if res.status_code != 200:
@@ -284,7 +287,7 @@ class Libc:
 
 
     def ChooseLibc(self, libcs, symbols, website):
-        if len(libcs) > 1:
+        if len(libcs) > 0:
             print("[+] %.2d Libc's Found [%s]" % (len(libcs), website))
             i = 1
             
