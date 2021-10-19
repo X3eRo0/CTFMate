@@ -68,7 +68,7 @@ def GetOffsetStdin():
 def GetOffsetArgv():
     log_level = pwn.context.log_level
     pwn.context.log_level = 'critical'
-    p = pwn.process([exe.path, cyclic(512)])
+    p = pwn.process([exe.path, pwn.cyclic(512)])
     p.wait()
     time.sleep(2)
     core = p.corefile
