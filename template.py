@@ -12,7 +12,7 @@ import pwn
 
 # Set up pwntools for the correct architecture
 exe  = pwn.context.binary = pwn.ELF('%s')
-pwn.context.terminal = ["tilix","-a","session-add-right","-e"]
+pwn.context.terminal = ["tilix", "-t", "CTFMate", "-a", "session-add-right", "-e"]
 pwn.context.delete_corefiles = True
 pwn.context.rename_corefiles = False
 
@@ -44,11 +44,7 @@ gdbscript = '''
 continue
 '''.format(**locals())
 
-#===========================================================
-#                    EXPLOIT GOES HERE
-#===========================================================
-
-io = start()
+io = None
 
 def GetOffsetStdin():
     log_level = pwn.context.log_level
@@ -79,5 +75,10 @@ def GetOffsetArgv():
     return ofst
 
 
+io = start()
+
+#===========================================================
+#                    EXPLOIT GOES HERE
+#===========================================================
 
 io.interactive()
