@@ -3,7 +3,7 @@
 
 # this exploit was generated via
 # 1) pwntools
-# 2) ctfinit
+# 2) ctfmate
 
 import os
 import time
