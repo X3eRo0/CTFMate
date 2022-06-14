@@ -8,6 +8,7 @@ import requests
 import shutil
 import argparse
 import signal
+import zstandard
 from bs4 import BeautifulSoup
 
 
@@ -16,7 +17,7 @@ libc_pkg = "libc6_%s.deb"
 
 ubuntu_libc_deb_urls = [
     "http://security.ubuntu.com/ubuntu/pool/main/g/glibc/",
-    "https://launchpad.net/ubuntu/+archive/primary/+files/"
+    "https://launchpad.net/ubuntu/+archive/primary/+files/",
 ]
 
 debian_libc_deb_urls = [
@@ -26,7 +27,7 @@ debian_libc_deb_urls = [
 GLIBC_VERSION_STR = [
     b"GNU C Library (Ubuntu GLIBC ",
     b"GNU C Library (Ubuntu EGLIBC ",
-    b"GNU C Library (Debian GLIBC "
+    b"GNU C Library (Debian GLIBC ",
 ]
 
 try:
@@ -42,10 +43,24 @@ def reporthook(blocknum, blocksize, totalsize):
     if totalsize > 0:
         percent = readsofar * 1e2 / totalsize
         s = "\r[+] Fetching     : [%5.1f%% %*d KB / %d KB] %s" % (
-            percent, len(str(totalsize)), readsofar/1024, totalsize/1024, FILENAME)
+            percent,
+            len(str(totalsize)),
+            readsofar / 1024,
+            totalsize / 1024,
+            FILENAME,
+        )
         sys.stderr.write(s)
         if readsofar >= totalsize:
-            sys.stderr.write("\r[+] Fetched      : [%5.1f%% %*d KB / %d KB] %s\n" % (100.0, len(str(totalsize)), totalsize/1024, totalsize/1024, FILENAME))
+            sys.stderr.write(
+                "\r[+] Fetched      : [%5.1f%% %*d KB / %d KB] %s\n"
+                % (
+                    100.0,
+                    len(str(totalsize)),
+                    totalsize / 1024,
+                    totalsize / 1024,
+                    FILENAME,
+                )
+            )
     else:
         sys.stderr.write("read %d\n" % (readsofar,))
 
@@ -65,6 +80,7 @@ def Download(url, directory, filename):
 
     return fullpath
 
+
 def GetUrl(urllist, file):
 
     for url in urllist:
@@ -73,6 +89,7 @@ def GetUrl(urllist, file):
         if r.status_code != 404:
             return fullurl
     return None
+
 
 def CheckELF(file):
 
@@ -83,12 +100,13 @@ def CheckELF(file):
 
     return False
 
+
 def CheckDependencies():
 
     try:
-        proc = subprocess.Popen(["eu-unstrip", "--help"],
-                stdout = subprocess.PIPE,
-                stderr = subprocess.PIPE)
+        proc = subprocess.Popen(
+            ["eu-unstrip", "--help"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
         stdout, stderr = proc.communicate()
         eu_unstrip = proc.returncode
 
@@ -96,9 +114,9 @@ def CheckDependencies():
         eu_unstrip = -1
 
     try:
-        proc = subprocess.Popen(["patchelf", "--help"],
-                stdout = subprocess.PIPE,
-                stderr = subprocess.PIPE)
+        proc = subprocess.Popen(
+            ["patchelf", "--help"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
         stdout, stderr = proc.communicate()
         patchelf = proc.returncode
 

@@ -105,11 +105,24 @@ def main(binary, libcfile, linkerfile, host, port):
     libc.GetGLibcPkg()
 
     if libc.debugfile != None:
-        code = libc.Unstrip()
-        if code != 0:
-            print('[-] Error        : "eu-unstrip" [%.d] -- %s' % (code, libc.filename))
+        code = libc.ExtractLibc()
+        if code is not True:
+            msg = "[-] Error        : %s"
+            if code == -1:
+                m = "Data archive not found in libc package"
+            if code == -2:
+                m = "Debug libc not found in libc package"
+            print(msg % m)
         else:
-            print("[+] Patched      : %s" % libc.filename)
+            code = libc.Unstrip()
+            if code != 0:
+                msg = '[-] Error        : "eu-unstrip" [%.d] -- %s' % (
+                    code,
+                    libc.filename,
+                )
+            else:
+                msg = "[+] Patched      : %s" % libc.filename
+            print(msg)
 
     if linkerfile == None:
         if libc.linker.GetLinker() != True:
