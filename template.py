@@ -9,12 +9,25 @@ import os
 import time
 import pwn
 
+BINARY = "%s"
+LIBC = "%s"
+LD = "%s"
 
 # Set up pwntools for the correct architecture
-exe = pwn.context.binary = pwn.ELF('%s')
-pwn.context.terminal = ["tilix", "-t", "CTFMate", "-a", "session-add-right", "-e"]
+exe = pwn.context.binary = pwn.ELF(BINARY)
+libc = pwn.ELF(LIBC)
+ld = pwn.ELF(LD)
+pwn.context.terminal = ["tmux", "splitw", "-h"]
 pwn.context.delete_corefiles = True
 pwn.context.rename_corefiles = False
+p64 = pwn.p64
+u64 = pwn.u64
+p32 = pwn.p32
+u32 = pwn.u32
+p16 = pwn.p16
+u16 = pwn.u16
+p8  = pwn.p8
+u8  = pwn.u8
 
 host = pwn.args.HOST or '%s'
 port = int(pwn.args.PORT or %s)
@@ -48,42 +61,15 @@ gdbscript = '''
 continue
 '''.format(**locals())
 
-io = None
+def pwn():
 
+    io = start()
 
-def GetOffsetStdin():
-    log_level = pwn.context.log_level
-    pwn.context.log_level = 'critical'
-    p = pwn.process(exe.path)
-    p.sendline(pwn.cyclic(512))
-    p.wait()
-    time.sleep(2)
-    core = p.corefile
-    fault = core.fault_addr
-    ofst = pwn.cyclic_find(fault & 0xffffffff)
-    p.close()
-    pwn.context.log_level = log_level
-    return ofst
+    # ===========================================================
+    #                    EXPLOIT GOES HERE
+    # ===========================================================
 
+    io.interactive()
 
-def GetOffsetArgv():
-    log_level = pwn.context.log_level
-    pwn.context.log_level = 'critical'
-    p = pwn.process([exe.path, pwn.cyclic(512)])
-    p.wait()
-    time.sleep(2)
-    core = p.corefile
-    fault = core.fault_addr
-    ofst = pwn.cyclic_find(fault & 0xffffffff)
-    p.close()
-    pwn.context.log_level = log_level
-    return ofst
-
-
-io = start()
-
-# ===========================================================
-#                    EXPLOIT GOES HERE
-# ===========================================================
-
-io.interactive()
+if __name__ == "__main__":
+    pwn()

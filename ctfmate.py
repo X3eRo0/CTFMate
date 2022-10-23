@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+from pwn import context, ELF as ELFInfo
 from libc import *
 from common import *
 
@@ -49,7 +50,10 @@ def PatchFunction(binary, funcname):
             f.write(data)
 
 
-def GenerateTemplate(binary, host, port):
+def GenerateTemplate(binary, host, port, libc, ld):
+
+    context.log_level = 'critical'
+    bininfo = ELFInfo(binary, checksec=False)
 
     if host == None:
         host = "127.0.0.1"
@@ -57,13 +61,19 @@ def GenerateTemplate(binary, host, port):
     if port == None:
         port = "1337"
 
+    if libc == "":
+        libc = bininfo.libc.path
+
+    if ld == "":
+        ld = bininfo.linker.decode('latin1')
+
     template_path = os.path.join(
         os.path.dirname(os.path.realpath(__file__)), "template.py"
     )
     with open(template_path, "r") as t:
         template = t.read()
 
-    template = template % (binary, host, port)
+    template = template % (binary, libc, ld, host, port)
     template_path = os.path.join(os.getcwd(), "exploit.py")
     with open(template_path, "w") as t:
         t.write(template)
@@ -86,7 +96,7 @@ def main(binary, libcfile, linkerfile, host, port):
         libc = Libc(libfile)
 
     if libcfile == None and libc.filename == None:
-        GenerateTemplate(binary, host, port)
+        GenerateTemplate(binary, host, port, "", "")
         return
 
     if not os.path.exists(binary):
@@ -147,7 +157,7 @@ def main(binary, libcfile, linkerfile, host, port):
         print("[+] Patched      : %s" % binary)
 
     PatchFunction(binary, b"alarm")
-    GenerateTemplate(binary, host, port)
+    GenerateTemplate(binary, host, port, libc.fullpath, libc.linker.fullpath)
 
 
 if __name__ == "__main__":
@@ -227,7 +237,7 @@ if __name__ == "__main__":
 
         elif args.template:
             if args.binary:
-                GenerateTemplate(args.binary, args.host, args.port)
+                GenerateTemplate(args.binary, args.host, args.port, "", "")
             else:
                 parser.print_usage()
 
