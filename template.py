@@ -61,7 +61,7 @@ gdbscript = '''
 continue
 '''.format(**locals())
 
-def pwn():
+def exp():
 
     io = start()
 
@@ -72,4 +72,4 @@ def pwn():
     io.interactive()
 
 if __name__ == "__main__":
-    pwn()
+    exp()
