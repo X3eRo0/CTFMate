@@ -62,10 +62,16 @@ def GenerateTemplate(binary, host, port, libc, ld):
         port = "1337"
 
     if libc == "":
-        libc = bininfo.libc.path
+        if bininfo.libc is None:
+            libc = "/lib/x86_64-linux-gnu/libc.so.6"
+        else:
+            libc = bininfo.libc.path
 
     if ld == "":
-        ld = bininfo.linker.decode('latin1')
+        if bininfo.linker is None:
+            ld = "/lib64/ld-linux-x86-64.so.2"
+        else:
+            ld = bininfo.linker.decode('latin1')
 
     template_path = os.path.join(
         os.path.dirname(os.path.realpath(__file__)), "template.py"
