@@ -2,3 +2,4 @@ unix_ar
 requests
 bs4
 pwntools
+zstandard
