@@ -3,12 +3,7 @@ General CTF Helper tool
 
 ### Install
 ```
-$ sudo apt-get install elfutils patchelf
-$ git clone https://github.com/X3eRo0/CTFMate.git ~/CTFMate
-$ cd ~/CTFMate
-$ pip install -r requirements.txt
-$ chmod +x ctfmate.py
-$ sudo ln -s ~/CTFMate/ctfmate.py /usr/bin/ctfmate
+curl https://raw.githubusercontent.com/X3eRo0/CTFMate/main/install.sh | sh
 ```
 
 ### Usage
