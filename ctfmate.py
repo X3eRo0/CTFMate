@@ -92,14 +92,13 @@ def main(binary, libcfile, linkerfile, host, port):
     print("[+] Binary       : %s" % binary)
 
     cdfiles = AbsoluteFilePaths(os.getcwd())
-    libfile = None
     if libcfile == None:
         for file in cdfiles:
             if CheckLibc(file):
-                libfile = file
+                libcfile = file
                 break
 
-        libc = Libc(libfile)
+    libc = Libc(libcfile)
 
     if libcfile == None and libc.filename == None:
         GenerateTemplate(binary, host, port, "", "")
@@ -214,6 +213,7 @@ if __name__ == "__main__":
             and not args.patch_interpreter
             and not args.template
         ):
+            print(args.libc)
             main(args.binary, args.libc, args.linker, args.host, args.port)
 
         elif args.search:
