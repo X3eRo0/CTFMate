@@ -87,19 +87,18 @@ def GenerateTemplate(binary, host, port, libc, ld):
         return
 
 
-def main(binary, libcfile, linkerfile, host, port):
+def main(binary, libcfile, linkerfile, host, port, template):
 
     print("[+] Binary       : %s" % binary)
 
     cdfiles = AbsoluteFilePaths(os.getcwd())
-    libfile = None
     if libcfile == None:
         for file in cdfiles:
             if CheckLibc(file):
-                libfile = file
+                libcfile = file
                 break
 
-        libc = Libc(libfile)
+    libc = Libc(libcfile)
 
     if libcfile == None and libc.filename == None:
         GenerateTemplate(binary, host, port, "", "")
@@ -163,7 +162,9 @@ def main(binary, libcfile, linkerfile, host, port):
         print("[+] Patched      : %s" % binary)
 
     PatchFunction(binary, b"alarm")
-    GenerateTemplate(binary, host, port, libc.fullpath, libc.linker.fullpath)
+
+    if template:
+        GenerateTemplate(binary, host, port, libc.fullpath, libc.linker.fullpath)
 
 
 if __name__ == "__main__":
@@ -214,7 +215,8 @@ if __name__ == "__main__":
             and not args.patch_interpreter
             and not args.template
         ):
-            main(args.binary, args.libc, args.linker, args.host, args.port)
+            print(args.libc)
+            main(args.binary, args.libc, args.linker, args.host, args.port, args.template)
 
         elif args.search:
             Search()
