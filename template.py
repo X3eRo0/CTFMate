@@ -17,7 +17,13 @@ LD = "%s"
 exe = pwn.context.binary = pwn.ELF(BINARY)
 libc = pwn.ELF(LIBC)
 ld = pwn.ELF(LD)
-pwn.context.terminal = ["tmux", "splitw", "-h"]
+pwn.context.terminal = [
+    "kitty",
+    "@",
+    "launch",
+    "--location=vsplit",
+    "--cwd=current_directory",
+]
 pwn.context.delete_corefiles = True
 pwn.context.rename_corefiles = False
 p64 = pwn.p64

@@ -1,0 +1,4 @@
+#!/bin/bash
+
+. /home/x3ero0/CTFMate/CTFMateEnv/bin/activate
+python /home/x3ero0/CTFMate/ctfmate.py "$@"
